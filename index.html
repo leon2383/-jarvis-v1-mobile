@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="de"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071018"><link rel="manifest" href="manifest.json"><title>JARVIS V1 Mobile</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#071018;color:#eaf7ff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif}
+.app{max-width:700px;margin:auto;min-height:100vh;display:flex;flex-direction:column;padding:18px}
+header{display:flex;align-items:center;gap:14px;padding:10px 4px 18px}.logo{width:48px;height:48px;border:1px solid #35bde8;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#7ee8ff;box-shadow:0 0 25px #123b4c}
+h1{font-size:25px;letter-spacing:6px;margin:0}.status{font-size:12px;color:#74a5b5;margin-top:4px}
+.chat{flex:1;overflow:auto;padding:8px 0 120px}.msg{padding:13px 15px;margin:10px 0;border-radius:17px;line-height:1.45;white-space:pre-wrap;max-width:90%}.user{margin-left:auto;background:#123b4c}.jarvis{background:#0d1b24;border:1px solid #173746}
+.bottom{position:fixed;bottom:0;left:0;right:0;background:rgba(7,16,24,.94);backdrop-filter:blur(15px);padding:10px 14px 18px}.row{display:flex;gap:8px}.input{flex:1;background:#0d1b24;color:white;border:1px solid #294452;border-radius:18px;padding:13px 15px;font-size:16px;outline:none}
+button{border:0;border-radius:17px;padding:0 14px;background:#11617d;color:white;font-weight:600}.mic{width:54px;font-size:20px}.mic.active{background:#a32d45}
+.settings{margin-top:8px;display:flex;gap:8px}.settings input{flex:1;background:#09141b;border:1px solid #203742;color:#9fc0ca;border-radius:10px;padding:8px;font-size:11px}.small{font-size:11px;color:#7294a0;text-align:center;margin-top:7px}
+</style></head><body><div class="app"><header><div class="logo">J</div><div><h1>JARVIS</h1><div class="status" id="status">SYSTEM ONLINE · MOBILE V1</div></div></header><main class="chat" id="chat"></main></div>
+<div class="bottom"><div class="row"><input id="input" class="input" placeholder="Sag oder schreibe etwas …"><button id="send">Senden</button><button id="mic" class="mic">🎙️</button></div>
+<div class="settings"><input id="ollama" placeholder="Optional: Ollama URL im WLAN"><button id="save">KI</button></div><div class="small">Lokale Demo + optional Ollama auf deinem PC.</div></div>
+<script>
+const chat=document.querySelector('#chat'),input=document.querySelector('#input'),status=document.querySelector('#status'),ollama=document.querySelector('#ollama');
+let memories=JSON.parse(localStorage.getItem('jarvis_memory')||'[]');ollama.value=localStorage.getItem('jarvis_ollama')||'';
+function add(w,t){const d=document.createElement('div');d.className='msg '+(w==='Du'?'user':'jarvis');d.textContent=d.textContent=w+':\n'+t;chat.appendChild(d);chat.scrollTop=chat.scrollHeight}
+function mem(){localStorage.setItem('jarvis_memory',JSON.stringify(memories))}
+function local(t){const x=t.toLowerCase().trim();
+if(x.startsWith('merke dir ')){let v=t.slice(10).trim();if(v){memories.push(v);mem();return'Gespeichert.'}}
+if(x.includes('was hast du dir gemerkt'))return memories.length?'Ich habe mir gemerkt:\n• '+memories.slice(-20).join('\n• '):'Ich habe noch nichts gespeichert.';
+if(x==='lösche gedächtnis'||x==='vergiss alles'){memories=[];mem();return'Das lokale Gedächtnis wurde gelöscht.'}
+if(x.includes('uhrzeit'))return'Es ist '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+'.';
+if(x.includes('datum'))return'Heute ist '+new Date().toLocaleDateString('de-DE')+'.';
+if(x.includes('hallo')||x.includes('hey jarvis'))return'Hallo. JARVIS V1 Mobile ist bereit.';
+if(x.includes('hilfe'))return'Du kannst z.B. „Merke dir …“ oder „Was hast du dir gemerkt?“ sagen.';
+return null}
+function speak(t){if('speechSynthesis'in window){speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(t);u.lang='de-DE';u.rate=.98;speechSynthesis.speak(u)}}
+async function ask(t){add('Du',t);status.textContent='VERARBEITUNG …';let a=local(t);if(a){add('JARVIS',a);speak(a);status.textContent='SYSTEM ONLINE · MOBILE V1';return}
+let url=ollama.value.trim().replace(/\/$/,'');if(url){try{let r=await fetch(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'llama3.2:3b',stream:false,messages:[{role:'system',content:'Du bist JARVIS, ein freundlicher persönlicher Assistent. Antworte auf Deutsch.'},{role:'user',content:t}]})});if(!r.ok)throw Error(r.status);let j=await r.json();a=j.message?.content||'Keine Antwort.';add('JARVIS',a);speak(a);status.textContent='OLLAMA ONLINE';return}catch(e){a='Die lokale KI ist nicht erreichbar. Prüfe Ollama und die WLAN-Adresse.';add('JARVIS',a);speak(a);status.textContent='KI OFFLINE';return}}
+a='Für freie Fragen braucht V1 eine KI-Verbindung. Trage unten optional die Ollama-Adresse deines PCs ein.';add('JARVIS',a);speak(a);status.textContent='SYSTEM ONLINE · MOBILE V1'}
+document.querySelector('#send').onclick=()=>{let t=input.value.trim();if(t){input.value='';ask(t)}};input.addEventListener('keydown',e=>{if(e.key==='Enter')document.querySelector('#send').click()});
+document.querySelector('#save').onclick=()=>{localStorage.setItem('jarvis_ollama',ollama.value.trim());status.textContent=ollama.value.trim()?'OLLAMA ADRESSE GESPEICHERT':'LOKALE DEMO'};
+let rec,listening=false;if('webkitSpeechRecognition'in window||'SpeechRecognition'in window){const R=window.SpeechRecognition||window.webkitSpeechRecognition;rec=new R();rec.lang='de-DE';rec.interimResults=false;rec.onstart=()=>{listening=true;document.querySelector('#mic').classList.add('active');status.textContent='ICH HÖRE ZU …'};rec.onend=()=>{listening=false;document.querySelector('#mic').classList.remove('active');status.textContent='SYSTEM ONLINE · MOBILE V1'};rec.onresult=e=>ask(e.results[0][0].transcript);document.querySelector('#mic').onclick=()=>listening?rec.stop():rec.start()}else document.querySelector('#mic').onclick=()=>alert('Bitte Safari verwenden.');
+add('JARVIS','System online. Ich bin JARVIS V1 Mobile. Sag „Hey Jarvis“ oder schreibe mir.');
+</script></body></html>
